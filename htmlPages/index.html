@@ -10,8 +10,14 @@
     <button onclick="createLobby()"">Create Lobby</button>
     <button onclick="joinLobby()"">Join Lobby</button>
 
-    <input type="text" id="nameInput" style="opacity: 0;"">
-    <button onclick="submitName()" id="submitName" style="opacity: 0;">Submit</button>
+    <input type="text" id="nameInput" placeholder="Input Name"">
+
+    <input type="text" id="lobbyName" placeholder="Input Name of Lobby" style="display: none;">
+    <input type="text" id="lobbyPass" placeholder="Input Pass of Lobby" style="display: none;">
+    
+    <button id="finalCreate" onclick="finalCreate()" style="display: none;">Create</button>
+    <button id="finalJoin" onclick="finalJoin()" style="display: none;">Join</button>
+    
 
     <script src="../server.js"></script>
 </body>
