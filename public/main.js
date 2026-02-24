@@ -46,15 +46,34 @@ async function finalCreate(){
         return
     }
     
-    window.location = `lobby.html?lobby=${details.lobbyName}&user=${details.username}`
+    window.location = `lobby.html?lobby=${details.lobbyName}&user=${details.username}&pass=${details.lobbyPass}`
     
 }
 async function finalJoin(){
-    if(!await checkLobbyDetails()){
-        //Let user know details need fixing
+    if(!await checkLobbyDetails()) return
+
+    const username = document.getElementById("nameInput").value
+    const lobbyName = document.getElementById("lobbyName").value
+    const lobbyPass = document.getElementById("lobbyPass").value
+
+    const res = await fetch("/joinLobby", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, lobbyName, lobbyPass })
+    })
+
+    const data = await res.json()
+
+    if (!data.success) {
+        alert(data.error)
         return
     }
+
+    // redirect instead of emitting socket here
+    window.location =
+        `lobby.html?lobby=${lobbyName}&user=${username}&pass=${lobbyPass}`
 }
+
 
 
 
@@ -66,10 +85,25 @@ function checkLobbyDetails(){
 
 function loadDetails(){
     const socket = io()
+
     const params = new URLSearchParams(window.location.search);
     const lobby = params.get("lobby");
     const user = params.get("user");
+    const pass = params.get("pass");
 
     document.body.innerHTML += `<h2>Lobby: ${lobby}</h2>`;
     document.body.innerHTML += `<p>You are: ${user}</p>`;   
+
+    // ✅ join lobby once page loads
+    socket.emit("joinLobby", {
+        username: user,
+        lobbyName: lobby,
+        lobbyPass: pass
+    })
+
+    socket.on("lobbyUpdate", players => {
+        console.log("Players:", players)
+    })
+
+    socket.on("errorMSG", msg => alert(msg))
 }
