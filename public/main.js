@@ -47,6 +47,7 @@ async function finalCreate(){
     }
     
     window.location = `lobby.html?lobby=${details.lobbyName}&user=${details.username}`
+    
 }
 async function finalJoin(){
     if(!await checkLobbyDetails()){
@@ -64,6 +65,7 @@ function checkLobbyDetails(){
 }
 
 function loadDetails(){
+    const socket = io()
     const params = new URLSearchParams(window.location.search);
     const lobby = params.get("lobby");
     const user = params.get("user");
