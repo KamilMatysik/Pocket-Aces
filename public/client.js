@@ -69,9 +69,8 @@ async function finalJoin(){
         return
     }
 
-    // redirect instead of emitting socket here
-    window.location =
-        `lobby.html?lobby=${lobbyName}&user=${username}&pass=${lobbyPass}`
+
+    window.location =`lobby.html?lobby=${lobbyName}&user=${username}&pass=${lobbyPass}`
 }
 
 
@@ -94,7 +93,7 @@ function loadDetails(){
     document.body.innerHTML += `<h2>Lobby: ${lobby}</h2>`;
     document.body.innerHTML += `<p>You are: ${user}</p>`;   
 
-    // ✅ join lobby once page loads
+
     socket.emit("joinLobby", {
         username: user,
         lobbyName: lobby,
