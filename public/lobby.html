@@ -1,32 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poker Lobby</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Lobby</title>
 </head>
 <body onload="loadDetails()">
 
-    <h2>Poker Lobby</h2>
+<h2>Poker Lobby</h2>
 
-    <h3>Players in Lobby</h3>
-    <div id="players"></div>
+<h3>Players in Lobby</h3>
+<div id="players"></div>
 
-    <h3>Game Stage</h3>
-    <div id="stage">Stage: preflop</div>
+<h3>Game Stage</h3>
+<div id="stage">Stage: preflop</div>
 
-    <button id="startBtn" onclick="startPoker()">Start Game</button>
-    <button id="flopBtn" onclick="dealFlop()" disabled>Flop</button>
-    <button id="turnBtn" onclick="dealTurn()" disabled>Turn</button>
-    <button id="riverBtn" onclick="dealRiver()" disabled>River</button>
+<button id="startBtn" onclick="startPoker()">Start Game</button>
+<button id="flopBtn" onclick="dealFlop()" disabled>Flop</button>
+<button id="turnBtn" onclick="dealTurn()" disabled>Turn</button>
+<button id="riverBtn" onclick="dealRiver()" disabled>River</button>
 
-    <h3>Your Cards</h3>
-    <div id="myCards"></div>
+<h3>Your Cards</h3>
+<div id="myCards"></div>
 
-    <h3>Community Cards</h3>
-    <div id="board"></div>
+<h3>Community Cards</h3>
+<div id="board"></div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="client.js"></script>
 </body>
 </html>
