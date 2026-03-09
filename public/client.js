@@ -64,7 +64,7 @@ function setupSocketListeners(){
         if(stageDiv) stageDiv.textContent = `Stage: ${data.stage}`;
     });
 
-    window.socket.on("gameEnded", data => alert(`Winner: ${data.winner} (value: ${data.value})`));
+    window.socket.on("gameEnded", data => alert(`Winner: ${data.winner}`));
 }
 
 // Poker actions
