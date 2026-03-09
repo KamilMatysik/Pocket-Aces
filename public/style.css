@@ -1,0 +1,35 @@
+@font-face {
+  font-family: Doom; /* set name */
+  src: url(AmazDooMRight.ttf); /* url of the font */
+}
+@font-face {
+  font-family: MainFont; /* set name */
+  src: url(Pixel\ Digivolve.otf); /* url of the font */
+}
+body {
+  background: repeating-linear-gradient( #ffd84b, #ffa4a4);
+background-size: cover;
+background-size: 100% 100%;
+background-repeat: no-repeat;
+position: relative;
+background-position: center;
+margin: 0;
+            padding: 0;
+            height: 100vh;
+}
+
+h1{
+    font-family: Doom;
+    -webkit-text-stroke: black 0.01vw;
+    color: #ce4141;
+    font-size: 7em;
+    text-align: center;
+    margin-top: 10px;
+    margin-bottom: 0.5vh;
+}
+h3{
+   text-align: center;
+    color: #320000;
+    box-shadow: #320000 0px 0px 10vw;
+    font-family: MainFont;
+}
