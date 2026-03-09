@@ -12,7 +12,10 @@ function createDeck() {
     }
     return deck;
 }
+function EndGame(){
+    
 
+}
 // Shuffle a deck using Fisher-Yates shuffle
 function shuffle(deck){
     for (let i = deck.length - 1; i > 0; i--){

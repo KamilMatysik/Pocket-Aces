@@ -7,10 +7,26 @@
     <link rel="stylesheet" href="style.css"
 </head>
 <body>
+    
+    <h1 style="font-size: 10vw;">Pocket Aces Lobbies</h1>
+    <div class="lobbymain">
+        <label>
+  Input Your Username:
+        </label>
+    <input type="text" id="nameInput" placeholder="Input Name"">
+
+    </div>
+<br><label>Choose your Font</label>
+  <select name ="Preferred Font" id="PlayerFont" style="width: 32vw;" dropzone="10px">
+    <option value="Default">Default  </option>
+    <option value="Molot"> Molot </option>
+</select>
+<div class="lobbymain">  
+<br>
     <button onclick="createLobby()"">Create Lobby</button>
+   
     <button onclick="joinLobby()"">Join Lobby</button>
 
-    <input type="text" id="nameInput" placeholder="Input Name"">
 
     <input type="text" id="lobbyName" placeholder="Input Name of Lobby" style="display: none;">
     <input type="text" id="lobbyPass" placeholder="Input Pass of Lobby" style="display: none;">
@@ -18,7 +34,7 @@
     <button id="finalCreate" onclick="finalCreate()" style="display: none;">Create</button>
     <button id="finalJoin" onclick="finalJoin()" style="display: none;">Join</button>
     
-
+</div>
     <script src="client.js"></script>
 </body>
 </html>
