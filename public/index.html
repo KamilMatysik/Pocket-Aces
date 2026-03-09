@@ -10,17 +10,80 @@
     
     <h1 style="font-size: 10vw;">Pocket Aces Lobbies</h1>
     <div class="lobbymain">
-        <label>
-  Input Your Username:
-        </label>
-    <input type="text" id="nameInput" placeholder="Input Name"">
-
+   
     </div>
-<br><label>Choose your Font</label>
-  <select name ="Preferred Font" id="PlayerFont" style="width: 32vw;" dropzone="10px">
-    <option value="Default">Default  </option>
+    <table class="customization" style="margin-left: 4vw;">
+      <tr>
+        <th>
+                 <label class="defaulttext">
+  Input Your Username
+        </label>
+
+        </th>
+        <th style="padding-left: 5vw;">
+    <label class="defaulttext">Choose your color</label>
+        </th>
+        <th>
+            <tr>
+                <th>
+    <input type="text" id="nameInput" placeholder="Input Name">
+                </th>
+                <th>
+                    <button class="colorselection" style="background-color: red;"></button>
+                    <button class="colorselection" style="background-color: blue;"></button>
+                    <button class="colorselection" style="background-color:yellow;"></button>
+                    <button class="colorselection" style="background-color:purple;"></button>
+                    <button class="colorselection" style="background-color:greenyellow;"></button>
+                </th>
+            </tr>
+
+        </th>
+      </tr>
+      
+        <tr>
+            <th>
+<br><label class="defaulttext">Choose your Font</label><br>
+            </th>
+</tr>  
+
+            <th>
+<select name ="Preferred Font" id="PlayerFont" style="width: 32vw;" dropzone="20px">
+    <option value="Default">Default</option>
     <option value="Molot"> Molot </option>
 </select>
+            </th>
+
+<tr>
+   
+</tr>
+    </table>
+    <table style="background-color: rgb(252, 255, 53); border-style:solid; border-radius: 2vw; border-color: black; border-width: 0.5vw; width: 80%; align-self: center;">
+        <tr style="border-style: solid; border-width: 1vw; border-color: black;">
+    <th class="padding">
+        <label class="customization">Username</label>
+    </th>
+     <th class="padding">
+        <label class="customization">Font</label>
+    </th>
+     <th class="padding">
+        <label class="customization">Color</label>
+    </th>
+</tr>
+<tr>
+    <th>
+        <label class="customization" id="Yourusername">Kamas</label>
+    </th>
+    <th>
+        <label class="customization" id="Yourfont">Default</label>
+
+    </th>
+    <th>
+        <label class="customization" id="Yourcolor">Color</label>
+
+    </th>
+    </tr>
+    </table>
+    
 <div class="lobbymain">  
 <br>
     <button onclick="createLobby()"">Create Lobby</button>

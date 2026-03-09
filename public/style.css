@@ -40,6 +40,49 @@ animation-name: HoverOutButtons;
 transform: scale(1);
   }
 }
+@keyframes Title{
+  0%{
+    scale: 1;
+  }
+  25%{
+    rotate: 3deg;
+  }
+  50%{
+    scale: 1.1;
+  }
+  75%{
+    rotate:-3deg;
+  }
+  99%{
+    scale: 1;
+  }
+}
+@keyframes BackgroundColorChange{ 
+  0%{
+    background-color: rgb(255, 132, 132);
+  }
+  10%{
+    background-color: rgb(255, 205, 113);
+  }
+  20%{
+    background-color: rgb(230, 230, 96);
+  }
+  30%{
+    background-color:rgb(201, 255, 120);
+  }
+  50%{
+    background-color: rgb(129, 129, 255);
+  }
+  70%{
+    background-color: rgb(205, 88, 205);
+  }
+  90%{
+    background-color: rgb(243, 132, 151);
+  }
+  100%{
+    background-color: rgb(255, 132, 132);
+  }
+}
 @keyframes MovingButtons{
   0%{
     transform: scale(1);
@@ -49,7 +92,7 @@ transform: scale(1.1);
   }
 }
 body {
-  background: repeating-linear-gradient( #ffd84b, #f8ff90);
+animation:ease BackgroundColorChange 10s infinite;
 background-size: cover;
 background-size: 100% 100%;
 background-repeat: no-repeat;
@@ -79,7 +122,33 @@ select{
 ::selection {
   background: red;
 }
+
+.defaulttext{
+    font-family: MainFont;
+    color: #320000;
+    font-size: 3.5vw;
+    align-content: center;
+    border: dotted;
+}
+.customization{
+  align-self: center ;
+  font-family: MainFont;
+  color: #320000;
+}
+.colorselection{
+  width: 2vw;
+  scale: 2.5;
+  padding: 1vw;
+  border: none;
+  margin: 1.5vw;
+}
+.padding{
+  padding: 2vw;
+}
 h1{
+  animation: Title 8s infinite;
+  animation-direction:normal;
+  animation-timing-function:linear;
     font-family: Doom;
     -webkit-text-stroke: black 0.01vw;
     color: #ce4141;
