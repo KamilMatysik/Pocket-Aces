@@ -7,26 +7,49 @@
 <link rel="stylesheet" href="style.css"></head>
 <body onload="loadDetails()">
 
-<h1>Pocket Aces</h1>
+<h2 id="lobbyTitle">Poker Lobby</h2>
+<p id="youAre"></p>
+<p id="myChips"></p>
+<p id="statusMsg"></p>
 
-<h3>Players in Lobby</h3>
-<div id="players"></div>
+<section>
+    <h3>Players</h3>
+    <div id="players"></div>
+</section>
 
-<h3>Game Stage</h3>
-<div id="stage">Stage: preflop</div>
+<section>
+    <button id="startBtn" onclick="startPoker()" style="display:none">▶ Start Game</button>
+</section>
 
-<button id="startBtn" onclick="startPoker()">Start Game</button>
-<button id="flopBtn" onclick="dealFlop()" disabled>Flop</button>
-<button id="turnBtn" onclick="dealTurn()" disabled>Turn</button>
-<button id="riverBtn" onclick="dealRiver()" disabled>River</button>
+<section>
+    <h3>Stage</h3>
+    <div id="stage">Stage: —</div>
+    <div id="potInfo">Pot: 0  |  Current bet: 0</div>
+    <div id="turnInfo"></div>
+</section>
 
-<h3>Your Cards</h3>
-<div id="myCards"></div>
+<section>
+    <h3>Your Cards</h3>
+    <div id="myCards"><em>None dealt yet</em></div>
+</section>
 
-<h3>Community Cards</h3>
-<div id="board"></div>
+<section>
+    <h3>Community Cards</h3>
+    <div id="board"><em>No cards yet</em></div>
+</section>
+
+<section id="bettingControls" style="display:none">
+    <h3>Your Action</h3>
+    <input id="betAmount" type="number" placeholder="Raise amount" min="0">
+    <br>
+    <button id="btnCheck" onclick="bet('check')">Check</button>
+    <button onclick="bet('call')">Call</button>
+    <button onclick="bet('raise')">Raise</button>
+    <button onclick="bet('fold')" style="background:#c0392b;color:white">Fold</button>
+</section>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="client.js"></script>
+
 </body>
 </html>

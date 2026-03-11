@@ -10,220 +10,360 @@ const io = new Server(server);
 app.use(express.json());
 app.use(express.static("public"));
 
-const lobbies = {};
-const activeGames = {};
+const lobbies = {};      // lobbyName -> { lobbyPass, players, host }
+const activeGames = {};  // lobbyName -> game
 
-// --- HTTP endpoints ---
+
+// ─── HTTP ────────────────────────────────────────────────────────────────────
+
 app.post("/createLobby", (req, res) => {
-    const {username, lobbyName, lobbyPass} = req.body;
-    if (!username || !lobbyName || !lobbyPass) return res.status(400).json({ error: "Missing data" });
-    if (lobbies[lobbyName]) return res.status(400).json({ error: "Lobby Name Already Exists" });
+    const { username, lobbyName, lobbyPass } = req.body;
+    if (!username || !lobbyName || !lobbyPass)
+        return res.status(400).json({ error: "Missing data" });
+    if (lobbies[lobbyName])
+        return res.status(400).json({ error: "Lobby name already exists" });
 
-    lobbies[lobbyName] = { lobbyPass, players: [] };
+    lobbies[lobbyName] = { lobbyPass, players: [], host: null };
     res.json({ success: true });
 });
 
 app.post("/joinLobby", (req, res) => {
     const { username, lobbyName, lobbyPass } = req.body;
-    if (!username || !lobbyName || !lobbyPass) return res.status(400).json({ error: "Missing data" });
+    if (!username || !lobbyName || !lobbyPass)
+        return res.status(400).json({ error: "Missing data" });
 
     const lobby = lobbies[lobbyName];
-    if (!lobby) return res.status(404).json({ error: "Lobby not found" });
+    if (!lobby)  return res.status(404).json({ error: "Lobby not found" });
     if (lobby.lobbyPass !== lobbyPass) return res.status(401).json({ error: "Wrong password" });
 
     res.json({ success: true });
 });
 
-// --- SOCKET.IO ---
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function broadcastLobby(lobbyName){
+    const lobby = lobbies[lobbyName];
+    if(!lobby) return;
+    io.to(lobbyName).emit("lobbyUpdate", {
+        players: lobby.players.map(p => ({ name: p.username, id: p.id })),
+        host: lobby.host
+    });
+}
+
+// Send the current game state to everyone in the lobby
+function broadcastGameState(lobbyName){
+    const game = activeGames[lobbyName];
+    if(!game) return;
+
+    io.to(lobbyName).emit("gameState", {
+        pot: game.pot,
+        currentBet: game.currentBet,
+        stage: game.stage,
+        community: game.community,
+        currentPlayerIndex: game.currentPlayerIndex,
+        currentPlayerId: game.players[game.currentPlayerIndex]?.id || null,
+        players: game.players.map(p => ({
+            id: p.id,
+            username: p.username,
+            chips: p.chips,
+            bet: p.bet,
+            folded: p.folded,
+            allIn: p.allIn
+        }))
+    });
+}
+
+// Prompt the current player it is their turn
+function promptCurrentPlayer(lobbyName){
+    const game = activeGames[lobbyName];
+    if(!game) return;
+
+    const player = game.players[game.currentPlayerIndex];
+    if(!player) return;
+
+    const canCheck = game.currentBet === player.bet;
+
+    io.to(lobbyName).emit("playerTurn", {
+        playerId: player.id,
+        username: player.username,
+        canCheck,
+        currentBet: game.currentBet,
+        playerBet: player.bet,
+        toCall: game.currentBet - player.bet
+    });
+}
+
+// Advance to the next non-folded, non-all-in player
+function nextTurn(lobbyName){
+    const game = activeGames[lobbyName];
+    if(!game) return;
+
+    // Check if round is over first
+    if(poker.isBettingRoundOver(game) || poker.isOnlyOneLeft(game)){
+        endBettingRound(lobbyName);
+        return;
+    }
+
+    const count = game.players.length;
+    let idx = (game.currentPlayerIndex + 1) % count;
+    for(let i = 0; i < count; i++){
+        const p = game.players[idx];
+        if(!p.folded && !p.allIn){
+            game.currentPlayerIndex = idx;
+            broadcastGameState(lobbyName);
+            promptCurrentPlayer(lobbyName);
+            return;
+        }
+        idx = (idx + 1) % count;
+    }
+
+    // All remaining players are all-in or folded
+    endBettingRound(lobbyName);
+}
+
+function endBettingRound(lobbyName){
+    const game = activeGames[lobbyName];
+    if(!game) return;
+
+    if(poker.isOnlyOneLeft(game)){
+        endGame(lobbyName);
+        return;
+    }
+
+    // Helper: deal next street, reset betting, broadcast.
+    // If nobody can act (all all-in), keep advancing until river then showdown.
+    function advanceStreet(){
+        if(game.stage === "preflop"){
+            poker.dealFlop(game);
+        } else if(game.stage === "flop"){
+            poker.dealTurn(game);
+        } else if(game.stage === "turn"){
+            poker.dealRiver(game);
+        } else if(game.stage === "river"){
+            endGame(lobbyName);
+            return;
+        }
+
+        broadcastGameState(lobbyName);
+        io.to(lobbyName).emit("stageUpdate", game.stage);
+
+        const canAct = poker.resetBettingRound(game);
+        broadcastGameState(lobbyName);
+
+        if(canAct){
+            promptCurrentPlayer(lobbyName);
+        } else {
+            // No one can act — keep running out streets automatically
+            advanceStreet();
+        }
+    }
+
+    advanceStreet();
+}
+
+function endGame(lobbyName){
+    const game = activeGames[lobbyName];
+    if(!game) return;
+
+    // ── Resolve pots ──────────────────────────────────────────────────────────
+    const { awards, reveal } = poker.isOnlyOneLeft(game)
+        ? poker.awardLastPlayer(game)
+        : poker.resolveShowdown(game);
+
+    // ── Persist chip counts back to lobby ─────────────────────────────────────
+    const lobby = lobbies[lobbyName];
+    if(lobby){
+        lobby.players.forEach(lp => {
+            const gp = game.players.find(p => p.id === lp.id);
+            if(gp) lp.chips = gp.chips;
+        });
+        lobby.dealerIndex = ((lobby.dealerIndex || 0) + 1) % lobby.players.length;
+    }
+
+    // ── Detect eliminations (0 chips after this hand) ─────────────────────────
+    const bustedIds = poker.getBustedPlayers(game);
+    const eliminated = [];
+
+    if(bustedIds.length > 0 && lobby){
+        bustedIds.forEach(id => {
+            const lp = lobby.players.find(p => p.id === id);
+            if(lp){
+                eliminated.push({ id: lp.id, username: lp.username });
+                // Remove from lobby so they can't play next round
+                lobby.players = lobby.players.filter(p => p.id !== id);
+            }
+        });
+    }
+
+    // ── Check for tournament winner (only one player left in lobby) ───────────
+    const tournamentOver = lobby && lobby.players.length === 1;
+    const tournamentWinner = tournamentOver ? lobby.players[0].username : null;
+
+    // ── Broadcast round result ────────────────────────────────────────────────
+    io.to(lobbyName).emit("roundOver", {
+        awards,
+        reveal,
+        eliminated,
+        tournamentOver,
+        tournamentWinner,
+        players: game.players.map(p => ({
+            id: p.id,
+            username: p.username,
+            chips: p.chips
+        }))
+    });
+
+    delete activeGames[lobbyName];
+
+    // If tournament is over, clean up the lobby entirely after a delay
+    if(tournamentOver){
+        setTimeout(() => {
+            delete lobbies[lobbyName];
+        }, 60000); // keep lobby object alive 60s so clients can see the result
+    } else {
+        // Adjust dealerIndex to stay in bounds after possible elimination
+        if(lobby) lobby.dealerIndex = lobby.dealerIndex % lobby.players.length;
+        // Broadcast updated lobby (minus eliminated players)
+        broadcastLobby(lobbyName);
+    }
+}
+
+
+// ─── SOCKET.IO ────────────────────────────────────────────────────────────────
+
 io.on("connection", socket => {
 
-    // Join lobby
+    // ── Join Lobby ──
     socket.on("joinLobby", ({ username, lobbyName, lobbyPass }) => {
         const lobby = lobbies[lobbyName];
         if (!lobby) return socket.emit("errorMSG", "Lobby not found");
         if (lobby.lobbyPass !== lobbyPass) return socket.emit("errorMSG", "Wrong password");
 
-        lobby.players.push({ id: socket.id, username, cards: [] });
+        if (!lobby.host) lobby.host = socket.id;
+
+        // Preserve chips if this player existed before (e.g. rejoin after round)
+        const existing = lobby.players.find(p => p.username === username);
+        const chips = existing ? existing.chips : 1000;
+        if(existing) lobby.players = lobby.players.filter(p => p.username !== username);
+        lobby.players.push({ id: socket.id, username, chips });
         socket.join(lobbyName);
-        io.to(lobbyName).emit("lobbyUpdate", lobby.players.map(p => p.username));
+        broadcastLobby(lobbyName);
     });
 
-    // Disconnect
+
+    // ── Kick Player ──
+    socket.on("kickPlayer", ({ lobbyName, playerId }) => {
+        const lobby = lobbies[lobbyName];
+        if (!lobby || socket.id !== lobby.host) return;
+
+        const game = activeGames[lobbyName];
+
+        // If game is active, fold the kicked player and advance if it was their turn
+        if(game){
+            const gp = game.players.find(p => p.id === playerId);
+            if(gp){
+                gp.folded = true;
+                gp.acted = true;
+                const wasTheirTurn = game.players[game.currentPlayerIndex]?.id === playerId;
+                if(wasTheirTurn) nextTurn(lobbyName);
+            }
+        }
+
+        lobby.players = lobby.players.filter(p => p.id !== playerId);
+
+        io.to(playerId).emit("kicked");
+        io.sockets.sockets.get(playerId)?.leave(lobbyName);
+
+        broadcastLobby(lobbyName);
+        if(game) broadcastGameState(lobbyName);
+    });
+
+
+    // ── Disconnect ──
     socket.on("disconnect", () => {
         for (const lobbyName in lobbies) {
             const lobby = lobbies[lobbyName];
+            // Only act if this socket is still a registered player in the lobby.
+            // Eliminated players are removed from lobby.players at round end, so
+            // their later socket disconnect should not affect the lobby at all.
+            if (!lobby.players.find(p => p.id === socket.id)) continue;
+
+            const game = activeGames[lobbyName];
+            if(game){
+                const gp = game.players.find(p => p.id === socket.id);
+                if(gp){
+                    gp.folded = true;
+                    gp.acted = true;
+                    if(game.players[game.currentPlayerIndex]?.id === socket.id)
+                        nextTurn(lobbyName);
+                }
+            }
+
             lobby.players = lobby.players.filter(p => p.id !== socket.id);
-            io.to(lobbyName).emit("lobbyUpdate", lobby.players.map(p => p.username));
+
+            if (lobby.host === socket.id && lobby.players.length > 0)
+                lobby.host = lobby.players[0].id;
+
+            broadcastLobby(lobbyName);
+            if(game) broadcastGameState(lobbyName);
         }
     });
 
-    // Start poker
+
+    // ── Start Game ──
     socket.on("startPoker", lobbyName => {
         const lobby = lobbies[lobbyName];
-        if(!lobby) return;
-        if(lobby.players[0].id !== socket.id) return socket.emit("errorMSG", "Only lobby creator can start the game");
+        if (!lobby) return;
+        if (socket.id !== lobby.host)
+            return socket.emit("errorMSG", "Only the host can start the game");
+        if (lobby.players.length < 2)
+            return socket.emit("errorMSG", "Need at least 2 players");
+        if (activeGames[lobbyName])
+            return socket.emit("errorMSG", "Game already in progress");
 
-        const game = poker.createGame(lobby.players);
+        // Wipe all game UI on every client before the new round starts
+        io.to(lobbyName).emit("roundReset");
+
+        const game = poker.createGame(lobby.players); // uses persisted chip counts from lobby
+        game.dealerIndex = lobby.dealerIndex || 0;
+
         poker.dealHands(game);
+
         activeGames[lobbyName] = game;
 
-        // Send private hands
-        for(let p of game.players){
+        // Send each player their private cards
+        for (const p of game.players)
             io.to(p.id).emit("yourCards", p.hand);
+
+        // Post blinds
+        const blindInfo = poker.postBlinds(game, 10, 20);
+
+        broadcastGameState(lobbyName);
+        io.to(lobbyName).emit("blindsPosted", blindInfo);
+        io.to(lobbyName).emit("stageUpdate", game.stage);
+
+        promptCurrentPlayer(lobbyName);
+    });
+
+
+    // ── Bet Action ──
+    socket.on("betAction", ({ lobbyName, action, amount }) => {
+        const game = activeGames[lobbyName];
+        if (!game) return;
+
+        const result = poker.applyAction(game, socket.id, action, amount);
+
+        if (!result.valid){
+            socket.emit("betError", result.error);
+            return;
         }
 
-        io.to(lobbyName).emit("gameStarted", {
-            community: game.community,
-            stage: game.stage
-        });
+        broadcastGameState(lobbyName);
+        nextTurn(lobbyName);
     });
 
-    // Deal flop
-    socket.on("dealFlop", lobbyName => {
-        const game = activeGames[lobbyName];
-        if(!game) return;
-        if(game.stage !== "preflop") return socket.emit("errorMSG", "Cannot deal flop now");
-
-        poker.dealFlop(game);
-        io.to(lobbyName).emit("communityUpdate", game.community);
-        io.to(lobbyName).emit("stageUpdate", game.stage);
-    });
-
-    // Deal turn
-    socket.on("dealTurn", lobbyName => {
-        const game = activeGames[lobbyName];
-        if(!game) return;
-        if(game.stage !== "flop") return socket.emit("errorMSG", "Cannot deal turn now");
-
-        poker.dealTurn(game);
-        io.to(lobbyName).emit("communityUpdate", game.community);
-        io.to(lobbyName).emit("stageUpdate", game.stage);
-    });
-
-    // Deal river
-    socket.on("dealRiver", lobbyName => {
-        const game = activeGames[lobbyName];
-        if(!game) return;
-        if(game.stage !== "turn") return socket.emit("errorMSG", "Cannot deal river now");
-
-        poker.dealRiver(game);
-        io.to(lobbyName).emit("communityUpdate", game.community);
-        io.to(lobbyName).emit("stageUpdate", game.stage);
-
-        // Determine winner after river
-        const winner = determineWinner(game);
-        io.to(lobbyName).emit("gameEnded", winner);
-    });
 });
 
-// ------------------------
-// POKER HAND EVALUATION
-// ------------------------
-
-// Convert "A of Hearts" -> {rank:"A", suit:"Hearts"}
-function parseCard(card){
-    const [rank, , suit] = card.split(" ");
-    return { rank, suit };
-}
-
-// Rank values
-const rankMap = {"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"10":10,"J":11,"Q":12,"K":13,"A":14};
-
-// Evaluate 7-card hand
-function evaluateHandFull(cards){
-    const parsed = cards.map(parseCard);
-    const suits = {};
-    const ranks = {};
-
-    parsed.forEach(c => {
-        suits[c.suit] = (suits[c.suit] || 0) + 1;
-        const val = rankMap[c.rank];
-        ranks[val] = (ranks[val] || 0) + 1;
-    });
-
-    const sortedRanks = Object.keys(ranks).map(Number).sort((a,b)=>b-a);
-
-    // Flush check
-    let flushSuit = null;
-    for(const s in suits) if(suits[s]>=5) flushSuit = s;
-
-    // Straight check
-    const rankSet = new Set(sortedRanks);
-    const straightHigh = findStraight(rankSet);
-
-    // Straight flush
-    if(flushSuit){
-        const flushCards = parsed.filter(c=>c.suit===flushSuit).map(c=>rankMap[c.rank]);
-        const flushSet = new Set(flushCards);
-        const sfHigh = findStraight(flushSet);
-        if(sfHigh) return {rank:9, highCard: sfHigh}; // straight flush
-    }
-
-    // Four of a kind
-    const four = Object.keys(ranks).find(r => ranks[r]===4);
-    if(four) return {rank:8, highCard: Number(four)};
-
-    // Full house
-    const three = Object.keys(ranks).filter(r=>ranks[r]===3).map(Number).sort((a,b)=>b-a);
-    const pairs = Object.keys(ranks).filter(r=>ranks[r]===2).map(Number).sort((a,b)=>b-a);
-    if(three.length>0 && (pairs.length>0 || three.length>1)) return {rank:7, highCard: three[0]};
-
-    // Flush
-    if(flushSuit){
-        const flushCards = parsed.filter(c=>c.suit===flushSuit).map(c=>rankMap[c.rank]);
-        return {rank:6, highCard: Math.max(...flushCards)};
-    }
-
-    // Straight
-    if(straightHigh) return {rank:5, highCard: straightHigh};
-
-    // Three of a kind
-    if(three.length>0) return {rank:4, highCard: three[0]};
-
-    // Two pair
-    if(pairs.length>=2) return {rank:3, highCard: pairs[0], secondHigh: pairs[1]};
-
-    // One pair
-    if(pairs.length===1) return {rank:2, highCard: pairs[0]};
-
-    // High card
-    return {rank:1, highCard: sortedRanks[0]};
-}
-
-// Find straight in a set of numeric ranks
-function findStraight(rankSet){
-    const ranks = Array.from(rankSet).sort((a,b)=>a-b);
-    for(let i=0;i<=ranks.length-5;i++){
-        if(ranks[i+4]-ranks[i]===4) return ranks[i+4];
-    }
-    // Ace-low straight (A,2,3,4,5)
-    if(rankSet.has(14)&&rankSet.has(2)&&rankSet.has(3)&&rankSet.has(4)&&rankSet.has(5)) return 5;
-    return null;
-}
-
-// Compare two hand objects {rank, highCard, secondHigh?}
-// Returns 1 if h1>h2, -1 if h1<h2, 0 if equal
-function compareHands(h1,h2){
-    if(h1.rank!==h2.rank) return h1.rank - h2.rank;
-    if(h1.highCard!==h2.highCard) return h1.highCard - h2.highCard;
-    if(h1.secondHigh!==h2.secondHigh) return (h1.secondHigh||0) - (h2.secondHigh||0);
-    return 0;
-}
-
-// Determine winner from game object
-function determineWinner(game){
-    let bestPlayer = null;
-    let bestValue = null;
-
-    for(const p of game.players){
-        const handValue = evaluateHandFull(p.hand.concat(game.community));
-        if(!bestValue || compareHands(handValue,bestValue) > 0){
-            bestValue = handValue;
-            bestPlayer = p.username;
-        }
-    }
-
-    return { winner: bestPlayer, hand: bestValue };
-}
 
 server.listen(3000, () => console.log("Server running on http://localhost:3000"));
